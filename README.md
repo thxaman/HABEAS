@@ -5,6 +5,7 @@ Track: **Agents That Act on Connected Data**
 
 
 HABEAS investigates synthetic financial-transfer alerts by traversing connected accounts and transactions, gathering evidence through MCP tools, testing competing hypotheses, applying a deterministic intervention policy, simulating a freeze before acting, and independently verifying the resulting graph state.
+try: (https://habeas.streamlit.app/)
 
 > **Synthetic data only.** HABEAS does not connect to real accounts, payment systems, or external financial services. Any freeze is a simulated mutation inside a disposable demo graph. Findings are risk indicators for human review, not legal conclusions.
 
