@@ -3,7 +3,6 @@
 **Graph-native financial-crime investigation on FalkorDB.**  
 Track: **Agents That Act on Connected Data**
 
-try: (https://habeas.streamlit.app/)
 
 HABEAS investigates synthetic financial-transfer alerts by traversing connected accounts and transactions, gathering evidence through MCP tools, testing competing hypotheses, applying a deterministic intervention policy, simulating a freeze before acting, and independently verifying the resulting graph state.
 
