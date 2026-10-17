@@ -160,7 +160,7 @@ Algorithms (plain Python in `src/tools/algorithms.py` and
 Requires **Docker** and **Python 3.11+** (developed on 3.14).
 
 ```bash
-git clone <your-fork-url> HABEAS && cd HABEAS
+git clone https://github.com/thxaman/HABEAS.git && cd HABEAS
 docker compose up -d                       # starts pinned FalkorDB v4.22.1 on :6379
 python -m venv .venv && . .venv/bin/activate     # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
