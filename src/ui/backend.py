@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import threading
 import time
 from pathlib import Path
@@ -53,6 +54,45 @@ _COMPLETED = (TERMINATION_EVIDENCE_SUFFICIENT, TERMINATION_NO_DISCRIMINATING_QUE
 
 # ------------------------------------------------------------------ settings
 
+#: Streamlit Community Cloud exposes configured secrets via ``st.secrets``.
+#: These keys, when present there and not already in the environment, are
+#: promoted into ``os.environ`` so the FalkorDB Cloud connection settings
+#: resolve exactly once and are inherited by the MCP server subprocess.
+_STREAMLIT_SECRET_KEYS = (
+    "FALKORDB_HOST",
+    "FALKORDB_PORT",
+    "FALKORDB_USERNAME",
+    "FALKORDB_PASSWORD",
+    "FALKORDB_TLS",
+    "FALKORDB_QUERY_TIMEOUT_MS",
+    "GRAPH_NAME",
+)
+
+
+def load_streamlit_secrets_into_env() -> list[str]:
+    """Promote FALKORDB_*/GRAPH_NAME secrets into the environment (idempotent).
+
+    A no-op outside Streamlit (no secrets file, no runtime): existing
+    environment variables always win. Values are moved into the process
+    environment only — they are never logged or echoed.
+    """
+    promoted: list[str] = []
+    try:  # Streamlit is only available in the app process
+        import streamlit as st
+
+        secrets = st.secrets
+        for key in _STREAMLIT_SECRET_KEYS:
+            try:
+                value = secrets[key]
+            except Exception:
+                continue  # key not configured in this deployment
+            if key not in os.environ and str(value).strip() != "":
+                os.environ[key] = str(value)
+                promoted.append(key)
+    except Exception:
+        return promoted
+    return promoted
+
 
 def ui_settings(
     base: Settings | None = None,
@@ -61,6 +101,7 @@ def ui_settings(
     tool_budget: int | None = None,
 ) -> Settings:
     """Settings for the UI's disposable demo graph (never caller-named)."""
+    load_streamlit_secrets_into_env()
     base = base or load_settings()
     return run_demo.demo_settings(
         base,

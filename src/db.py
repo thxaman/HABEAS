@@ -94,18 +94,73 @@ def classify_failure(
     else:
         kind, retryable = "unknown", False
     return QueryError(
-        str(exc), kind=kind, retryable=retryable, cypher=cypher, params=params
+        redact_secrets(str(exc)), kind=kind, retryable=retryable,
+        cypher=cypher, params=params,
     )
 
 
+def redact_secrets(text: str, settings: Settings | None = None) -> str:
+    """Scrub credential material out of free text (messages, logs, errors)."""
+    s = settings or get_settings()
+    out = text
+    password = s.falkordb_password.get_secret_value()
+    if password:
+        out = out.replace(password, "***")
+    return out
+
+
+def _scrub_exception(exc: Exception, settings: Settings | None = None) -> Exception:
+    """Redact credentials from an exception's own message, in place."""
+    scrubbed = tuple(
+        redact_secrets(arg, settings) if isinstance(arg, str) else arg
+        for arg in exc.args
+    )
+    if scrubbed != exc.args:
+        exc.args = scrubbed
+    return exc
+
+
 @lru_cache(maxsize=4)
-def _client_cached(host: str, port: int) -> FalkorDB:
-    return FalkorDB(host=host, port=port)
+def _client_cached(
+    host: str,
+    port: int,
+    username: str,
+    password: str,
+    tls: bool,
+) -> FalkorDB:
+    """One client per DISTINCT connection configuration (all settings keyed).
+
+    The password participates in the cache key so a settings change can never
+    silently reuse a client authenticated against different credentials; the
+    value lives only in this process's memory, never in a log.
+    """
+    return FalkorDB(
+        host=host,
+        port=port,
+        username=username or None,
+        password=password or None,
+        ssl=tls,
+    )
+
+
+def clear_client_cache() -> None:
+    """Drop cached clients (tests and config changes call this)."""
+    _client_cached.cache_clear()
 
 
 def get_client(settings: Settings | None = None) -> FalkorDB:
     s = settings or get_settings()
-    return _client_cached(s.falkordb_host, s.falkordb_port)
+    try:
+        return _client_cached(
+            s.falkordb_host,
+            s.falkordb_port,
+            s.falkordb_username,
+            s.falkordb_password.get_secret_value(),
+            s.falkordb_tls,
+        )
+    except Exception as exc:
+        # connection failures must name the cause, never the credentials
+        raise _scrub_exception(exc, s) from exc
 
 
 def get_graph(settings: Settings | None = None, name: str | None = None) -> Graph:

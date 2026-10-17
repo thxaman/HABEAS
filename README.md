@@ -161,6 +161,21 @@ python -m src.seed.generate --seed 42 --reset-demo-graph
 
 The reset command is explicitly opt-in and restricted to a demo-safe graph name. Configure a provider key in `.env` only if using real-provider mode; never commit `.env` or credentials. FakeLLM mode runs without an API key.
 
+## FalkorDB Cloud / Streamlit Community Cloud
+
+HABEAS also runs against a managed FalkorDB Cloud database. Set
+`FALKORDB_USERNAME`, `FALKORDB_PASSWORD` (kept as a `SecretStr`, never logged
+or rendered) and `FALKORDB_TLS=true`, plus `FALKORDB_HOST`/`FALKORDB_PORT`;
+leaving them empty keeps the local Docker default. On Streamlit Community
+Cloud the same values go into the app's Secrets, which are promoted into the
+process environment and inherited by the MCP server subprocess.
+
+The cloud database is seeded exactly once with the same guarded seeder
+(`GRAPH_NAME=HABEAS_demo_showcase_s42 python -m src.seed.generate --seed 42
+--reset-demo-graph` with the cloud variables set) — the app never reseeds on
+startup, on a rerun, or on a page load. Full steps, including the secrets
+format and verification, are in [`docs/falkordb-cloud.md`](docs/falkordb-cloud.md).
+
 ## Run the application and checks
 
 ```bash
@@ -209,6 +224,7 @@ Full details and methodology: [`eval/results.md`](eval/results.md) and [`eval/re
 - [Architecture](docs/architecture.md)
 - [Graph model](docs/graph-model.md)
 - [FalkorDB capabilities and probes](docs/falkordb-capabilities.md)
+- [FalkorDB Cloud deployment](docs/falkordb-cloud.md)
 - [Evaluation results](eval/results.md)
 - [Demo script](docs/demo-script.md)
 

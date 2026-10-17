@@ -80,9 +80,13 @@ def server_parameters(
         "FALKORDB_HOST": settings.falkordb_host,
         "FALKORDB_PORT": str(settings.falkordb_port),
         "FALKORDB_QUERY_TIMEOUT_MS": str(settings.falkordb_query_timeout_ms),
-        # The child must inherit the sandbox configuration, otherwise the
-        # action tools would never be registered and the parent's
-        # HABEAS_ENABLE_ACTIONS intent would be silently lost.
+        # FalkorDB Cloud: the child connects with the parent's RESOLVED
+        # connection settings, so secrets configured via Streamlit Community
+        # Cloud (st.secrets) reach the subprocess even when they were not
+        # plain environment variables in the parent. Values are forwarded
+        # through the process environment only — never logged anywhere.
+        "FALKORDB_USERNAME": settings.falkordb_username,
+        "FALKORDB_TLS": "true" if settings.falkordb_tls else "false",
         "HABEAS_DEMO_MODE": "true" if settings.habeas_demo_mode else "false",
         "HABEAS_ENABLE_ACTIONS": "true" if settings.habeas_enable_actions else "false",
         "LLM_MODE": settings.llm_mode,
@@ -92,6 +96,9 @@ def server_parameters(
         "PYTHONUNBUFFERED": "1",
         "PYTHONIOENCODING": "utf-8",
     })
+    if settings.falkordb_password.get_secret_value():
+        # forwarded only when configured; an empty local default stays unset
+        env["FALKORDB_PASSWORD"] = settings.falkordb_password.get_secret_value()
     return StdioServerParameters(
         command=command or sys.executable,
         args=args if args is not None else ["-m", SERVER_MODULE],

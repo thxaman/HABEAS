@@ -30,6 +30,12 @@ class Settings(BaseModel):
 
     falkordb_host: str = "localhost"
     falkordb_port: int = Field(default=6379, ge=1, le=65535)
+    # FalkorDB Cloud / managed instances: authenticate and speak TLS. Empty
+    # username/password and TLS off keep the default local Docker connection.
+    # The password is a SecretStr so it never leaks into repr/logs/reports.
+    falkordb_username: str = ""
+    falkordb_password: SecretStr = SecretStr("")
+    falkordb_tls: bool = False
     graph_name: str = "HABEAS_demo_local"
     # Default False: simulated actions require explicit opt-in (PLAN.md §9).
     habeas_demo_mode: bool = False
@@ -98,6 +104,9 @@ def load_settings() -> Settings:
     return Settings(
         falkordb_host=os.getenv("FALKORDB_HOST", "localhost"),
         falkordb_port=_env_int("FALKORDB_PORT", 6379),
+        falkordb_username=os.getenv("FALKORDB_USERNAME", ""),
+        falkordb_password=os.getenv("FALKORDB_PASSWORD", ""),
+        falkordb_tls=_env_bool("FALKORDB_TLS", False),
         graph_name=os.getenv("GRAPH_NAME", "HABEAS_demo_local"),
         habeas_demo_mode=_env_bool("HABEAS_DEMO_MODE", False),
         falkordb_query_timeout_ms=_env_int("FALKORDB_QUERY_TIMEOUT_MS", 10_000),
