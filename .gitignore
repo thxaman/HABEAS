@@ -33,4 +33,5 @@ Thumbs.db
 PLAN.md
 AGENTS.md
 
-docs/*
+docs/phase-*.md
+docs/demo-*.md
