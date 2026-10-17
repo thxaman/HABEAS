@@ -377,22 +377,11 @@ deterministic configuration they cost calls rather than save them.
 
 ## 10. Demo video and submission assets
 
-- Four-minute timestamped script and shot checklist:
-  [`docs/demo-script.md`](docs/demo-script.md).
-- Analyst UI: `streamlit run app.py` (see §7) — the three-scenario journey
-  (investigate → graph evidence → hypotheses → decision → simulation →
-  verification → report) without reading terminal logs.
-- Architecture and data-model details: [`docs/architecture.md`](docs/architecture.md),
-  [`docs/graph-model.md`](docs/graph-model.md).
-- Phase notes: [`docs/phase-2-tools.md`](docs/phase-2-tools.md),
-  [`docs/phase-5-actions.md`](docs/phase-5-actions.md),
-  [`docs/phase-6-reports.md`](docs/phase-6-reports.md),
-  [`docs/phase-7-evaluation.md`](docs/phase-7-evaluation.md).
-- Capability probes: [`docs/falkordb-capabilities.md`](docs/falkordb-capabilities.md).
 
-> No demo video has been recorded in this repository. `docs/demo-script.md`
-> contains the script and shot checklist to record it; the video itself is a
-> remaining submission step.
+https://github.com/user-attachments/assets/b12e6278-e677-4516-8ff6-01dbf8e1b9d8
+
+
+
 
 ---
 
