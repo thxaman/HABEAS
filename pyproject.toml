@@ -1,0 +1,5 @@
+[tool.pytest.ini_options]
+# `pytest -q` runs from the repo root; pythonpath makes `import src...` work
+# under bare pytest (not just `python -m pytest`).
+pythonpath = ["."]
+testpaths = ["tests"]

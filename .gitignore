@@ -1,0 +1,36 @@
+# Environment / secrets — commit .env.example, never .env
+.env
+
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+
+# Generated artifacts
+logs/*
+!logs/.gitkeep
+reports/*
+!reports/.gitkeep
+# Throwaway gate/log captures written to the repo root are generated output.
+logs_*.txt
+
+# Ground-truth manifest: generated locally, deterministic, never committed,
+# never agent-visible (PLAN.md §3/§5)
+src/seed/ground_truth.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+*.mp4
+
+PLAN.md
+AGENTS.md
+
+docs/*

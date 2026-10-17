@@ -1,0 +1,18 @@
+# HABEAS pinned, tested direct dependencies (PLAN.md §Dependencies).
+# Installed and import-verified on Python 3.14.5 / Windows in Phase 0.
+# mcp is capped at 1.x by langchain-mcp-adapters; mcp 2.x renames the server
+# API — do not bump blindly (see docs/falkordb-capabilities.md).
+falkordb==1.8.0
+mcp==1.30.0
+langgraph==1.2.15
+langchain-core==1.6.10
+langchain-mcp-adapters==0.3.2
+langchain-openai==1.7.2
+pydantic==2.13.5
+python-dotenv==1.2.3
+pytest==9.1.1
+faker==40.43.0
+rich==15.0.0
+streamlit==1.66.0   # Phase 8.5 analyst UI (app.py)
+plotly==7.1.0       # interactive graph + node/edge selection (st.plotly_chart on_select)
+networkx==3.6.1     # deterministic spring layout for the graph view

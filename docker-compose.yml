@@ -1,0 +1,15 @@
+# Pinned FalkorDB for the HABEAS demo graph (PLAN.md §4: never rely on
+# a moving `latest` tag). Tested with image v4.22.1 in Phase 0 —
+# see docs/falkordb-capabilities.md for observed versions and probes.
+services:
+  falkordb:
+    image: falkordb/falkordb:v4.22.1
+    container_name: habeas-falkordb
+    ports:
+      - "6379:6379"
+    volumes:
+      # Verified via `redis-cli CONFIG GET dir` on the running container.
+      - habeas_falkordb_data:/var/lib/falkordb/data
+
+volumes:
+  habeas_falkordb_data:
