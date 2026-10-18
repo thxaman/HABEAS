@@ -12,7 +12,9 @@ try: (https://habeas.streamlit.app/)
 ## Demo video
 
 [Watch the HABEAS demo](https://github.com/user-attachments/assets/b12e6278-e677-4516-8ff6-01dbf8e1b9d8)
+
 [Watch the HABEAS working demo](https://github.com/user-attachments/assets/e6084bd8-02c8-4184-907d-ff3336ab2dd1)
+
 
 
 ## Why a graph?
