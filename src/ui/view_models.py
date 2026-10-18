@@ -71,6 +71,9 @@ _VERIFICATION_CHIPS = {
     "mismatch": ("Mismatch", "error"),
     "unverifiable": ("Unverifiable", "abstain"),
     "skipped": ("Skipped", "muted"),
+    # A neutral fact (no assessment exists for this record), not a warning:
+    # render muted instead of falling through to the amber "watch" fallback.
+    "not_checked": ("Not checked", "muted"),
 }
 
 
@@ -413,7 +416,11 @@ def to_dot(graph: dict[str, Any]) -> str:
 # original ids stay untouched in the evidence records, the report and the
 # audit trail (this function is a UI-side lookup key, nothing else).
 _CASE_PREFIX = ":"
-_RECITATION_SUFFIX = re.compile(r"-v\d+$")
+# A citation id gains one OR MORE recitation suffixes when re-recorded
+# (``-v2``, then ``-v2-v3`` on a further re-citation). Strip every
+# consecutive suffix, case-insensitively, so ``EV-0001-v2``, ``EV-0001-V2``
+# and ``EV-0001-v2-v3`` all normalize to the same local id as ``EV-0001``.
+_RECITATION_SUFFIX = re.compile(r"(?:-v\d+)+$", re.IGNORECASE)
 
 
 def normalize_evidence_id(value: Any) -> str:
@@ -423,7 +430,33 @@ def normalize_evidence_id(value: Any) -> str:
     text = str(value).strip()
     if _CASE_PREFIX in text:
         text = text.rsplit(_CASE_PREFIX, 1)[1]
-    return _RECITATION_SUFFIX.sub("", text)
+    elif "/" in text:
+        text = text.rsplit("/", 1)[1]
+    return _RECITATION_SUFFIX.sub("", text).strip()
+
+
+def extract_case_id(value: Any) -> str:
+    """Extract case_id from an evidence id if prefixed (e.g. 'CASE-ALR-0001:EV-0001')."""
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if _CASE_PREFIX in text:
+        return text.rsplit(_CASE_PREFIX, 1)[0].strip()
+    if "/" in text:
+        return text.rsplit("/", 1)[0].strip()
+    return ""
+
+
+def _claim_val(claim: Any, key: str, default: Any = None) -> Any:
+    if isinstance(claim, dict):
+        return claim.get(key, default)
+    return getattr(claim, key, default)
+
+
+def _entry_val(entry: Any, key: str, default: Any = None) -> Any:
+    if isinstance(entry, dict):
+        return entry.get(key, default)
+    return getattr(entry, key, default)
 
 
 # Most severe first: when several assessments map to one evidence record we
@@ -458,23 +491,32 @@ def _dedupe(values: list[Any]) -> list[str]:
 
 
 def _match_claims(
-    verification_claims: list[dict[str, Any]] | None,
-) -> dict[str, list[dict[str, Any]]]:
-    """Group verification assessments by normalized evidence id."""
-    grouped: dict[str, list[dict[str, Any]]] = {}
+    verification_claims: list[dict[str, Any]] | list[Any] | None,
+) -> dict[str, list[Any]]:
+    """Group verification assessments by normalized evidence id.
+
+    Each claim is indexed under the normalized ``local_evidence_id`` when the
+    report provides one AND under the normalized raw ``evidence_id`` — the
+    two almost always coincide, and indexing both keeps the claim findable
+    by either id shape it was actually recorded with.
+    """
+    grouped: dict[str, list[Any]] = {}
     for claim in verification_claims or []:
-        key = claim.get("local_evidence_id") or normalize_evidence_id(
-            claim.get("evidence_id")
-        )
-        if not key:
-            continue
-        grouped.setdefault(key, []).append(claim)
+        raw_local = _claim_val(claim, "local_evidence_id")
+        raw_id = _claim_val(claim, "evidence_id")
+        keys: list[str] = []
+        for value in (raw_local, raw_id):
+            key = normalize_evidence_id(value) if value else ""
+            if key and key not in keys:
+                keys.append(key)
+        for key in keys:
+            grouped.setdefault(key, []).append(claim)
     return grouped
 
 
 def evidence_inspector_rows(
-    evidence_entries: list[dict[str, Any]],
-    verification_claims: list[dict[str, Any]] | None = None,
+    evidence_entries: list[dict[str, Any]] | list[Any],
+    verification_claims: list[dict[str, Any]] | list[Any] | None = None,
 ) -> list[dict[str, Any]]:
     """One row per evidence record: queries, stance, and verification outcome.
 
@@ -483,73 +525,117 @@ def evidence_inspector_rows(
     reported as verified. When several assessments match one record (e.g. a
     re-citation), the most severe outcome is surfaced with its own reason and
     every original verification id is retained.
+
+    Case ids are a soft signal, never a reason to HIDE a recorded assessment:
+    assessments recorded under the evidence record's own case id are
+    preferred, but when only cross-case assessments exist (a re-run that
+    minted a fresh case id, or evidence re-recorded under a stale case from
+    case memory), they still match — annotated in the details — instead of
+    dropping the record to ``not_checked``. Matching is done on the
+    normalized local id, so a case-id format change alone can never make a
+    real assessment invisible.
     """
     grouped = _match_claims(verification_claims)
     rows: list[dict[str, Any]] = []
     for entry in evidence_entries or []:
-        query_ids = list(entry.get("query_ids") or [])
-        row_counts = list(entry.get("row_count") or [])
-        key = normalize_evidence_id(entry.get("evidence_id"))
-        matches = grouped.get(key) or []
+        query_ids = list(_entry_val(entry, "query_ids") or [])
+        row_counts = list(_entry_val(entry, "row_count") or [])
+        raw_eid = _entry_val(entry, "evidence_id")
+        entry_case = _entry_val(entry, "case_id") or extract_case_id(raw_eid)
+        key = normalize_evidence_id(raw_eid)
+        candidates = grouped.get(key) or []
+        # Prefer same-case assessments; fall back to cross-case ones with an
+        # explicit note rather than reporting them as ``not_checked``.
+        matches = candidates
+        case_mismatch = False
+        if entry_case and candidates:
+            same_case = [
+                c for c in candidates
+                if not extract_case_id(_claim_val(c, "evidence_id"))
+                or entry_case == extract_case_id(_claim_val(c, "evidence_id"))
+            ]
+            if same_case:
+                matches = same_case
+            else:
+                case_mismatch = True
 
         if not matches:
             checked = False
             status = NOT_CHECKED
+            total = len(verification_claims or [])
             details = (
                 "no verification assessment recorded for this evidence id "
-                f"(looked up as {key or 'n/a'})"
+                f"(looked up as {key or 'n/a'}"
+                + (f"; {total} assessment(s) exist for other evidence ids"
+                   if total else
+                   "; no claim-level verification was recorded for this run")
+                + ")"
             )
             verification_ids: list[str] = []
             checked_sources: list[str] = []
             mismatched_sources: list[str] = []
+            chosen_reason = ""
         else:
             checked = True
             ranked = sorted(
                 matches,
-                key=lambda c: _severity_rank(str(c.get("status") or "unknown")),
+                key=lambda c: _severity_rank(str(_claim_val(c, "status") or "unknown")),
             )
             chosen = ranked[0]
-            status = str(chosen.get("status") or "unknown")
-            details = str(chosen.get("reason") or "")
+            status = str(_claim_val(chosen, "status") or "unknown")
+            chosen_reason = str(_claim_val(chosen, "reason") or "")
+            details = chosen_reason
             if len(matches) > 1:
                 extra = ", ".join(sorted({
-                    str(c.get("status") or "unknown") for c in matches
+                    str(_claim_val(c, "status") or "unknown") for c in matches
                 }))
                 suffix = (
                     f"{len(matches)} assessments matched this record "
                     f"({extra}); showing the most severe"
                 )
                 details = f"{details} · {suffix}" if details else suffix
-            verification_ids = _dedupe([c.get("evidence_id") for c in matches])
+            if case_mismatch:
+                claim_cases = sorted({
+                    extract_case_id(_claim_val(c, "evidence_id"))
+                    for c in matches
+                    if extract_case_id(_claim_val(c, "evidence_id"))
+                })
+                note = (
+                    "assessment recorded under a different case id ("
+                    + (", ".join(claim_cases) or "unknown")
+                    + "); matched by normalized evidence id"
+                )
+                details = f"{details} · {note}" if details else note
+            verification_ids = _dedupe([_claim_val(c, "evidence_id") for c in matches])
             checked_sources = _dedupe(
-                [q for c in matches for q in (c.get("checked_source_queries") or [])]
+                [q for c in matches for q in (_claim_val(c, "checked_source_queries") or [])]
             )
             mismatched_sources = _dedupe(
-                [q for c in matches for q in (c.get("mismatched_source_queries") or [])]
+                [q for c in matches for q in (_claim_val(c, "mismatched_source_queries") or [])]
             )
 
         rows.append(
             {
-                "evidence_id": entry.get("evidence_id"),
-                "tool": entry.get("tool"),
-                "ok": bool(entry.get("ok")),
-                "stance": entry.get("stance"),
+                "evidence_id": raw_eid,
+                "tool": _entry_val(entry, "tool"),
+                "ok": bool(_entry_val(entry, "ok")),
+                "stance": _entry_val(entry, "stance"),
                 "query_ids": query_ids,
                 "query_count": len(query_ids),
                 "multi_query": len(query_ids) > 1,
                 "total_rows": sum(int(r or 0) for r in row_counts),
-                "truncated_any": any(entry.get("truncated") or []),
+                "truncated_any": any(_entry_val(entry, "truncated") or []),
                 # `checked` means an assessment EXISTS / was attempted — it is
                 # NOT a statement that the evidence proved true.
                 "checked": checked,
                 "verification_status": status,
-                "verification_reason": (matches[0].get("reason") or "") if matches else "",
+                "verification_reason": chosen_reason,
                 "verification_details": details,
                 "verification_ids": verification_ids,
                 "verification_count": len(matches),
                 "checked_source_queries": checked_sources,
                 "mismatched_source_queries": mismatched_sources,
-                "interpretation": entry.get("interpretation") or "",
+                "interpretation": _entry_val(entry, "interpretation") or "",
             }
         )
     return rows

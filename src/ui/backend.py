@@ -191,6 +191,7 @@ def _empty_snapshot(
         "evidence": [],
         "limitations": [],
         "truncated_evidence": [],
+        "policy": None,
         "action": None,
         "simulation": None,
         "post_action": None,
@@ -274,7 +275,7 @@ def _post_action_view(envelopes: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _report_view(artifact) -> dict[str, Any]:
-    verification = artifact.verification
+    verification = getattr(artifact, "verification", None)
     claims = [
         {
             # original ids are preserved verbatim (report/audit fidelity);
@@ -293,16 +294,16 @@ def _report_view(artifact) -> dict[str, Any]:
                 for s in c.sources
             ],
         }
-        for c in verification.claims
+        for c in (verification.claims if verification else [])
     ]
     return {
         "case_id": artifact.case_id,
         "report_version": artifact.report_version,
         "markdown": artifact.markdown,
-        "summary": dict(verification.summary or {}),
-        "reference_summary": dict(verification.reference_summary or {}),
+        "summary": dict(verification.summary or {}) if verification else {},
+        "reference_summary": dict(verification.reference_summary or {}) if verification else {},
         "claims": claims,
-        "notes": list(verification.notes or []),
+        "notes": list(verification.notes or []) if verification else [],
         "written_to": None,  # filled by the caller after write_report
     }
 
@@ -401,6 +402,7 @@ def run_scenario(
                 r.evidence_id for r in state.evidence if any(r.truncated)
             ],
             "errors": [e for e in state.errors if e],
+            "policy": _action_view(result.envelopes),
             "action": _action_view(result.envelopes),
             "simulation": _simulation_view(result.envelopes),
             "post_action": _post_action_view(result.envelopes),

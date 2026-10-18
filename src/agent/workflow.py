@@ -211,6 +211,13 @@ async def run_case_workflow(
             cited = await call("cite_evidence",
                                {"case_id": case_id, "citations": citations})
             envelopes["cite_evidence"] = cited.envelope or {}
+            if not cited.ok:
+                err_msg = (
+                    cited.error
+                    or ((cited.envelope or {}).get("error") or {}).get("message")
+                    or "cite_evidence failed"
+                )
+                state.errors.append(f"cite_evidence failed: {err_msg}")
             emitter.emit(
                 type="action", stage="CITE_EVIDENCE",
                 title=f"Evidence cited — {len(citations)} citation(s)",

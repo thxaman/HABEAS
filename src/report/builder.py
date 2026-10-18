@@ -186,6 +186,13 @@ def _evidence_id_map(case_id: str, state, records: CaseRecords) -> dict[str, str
                 mapping[local] = scoped
             elif local in persisted:
                 mapping[local] = local
+            else:
+                matching = [
+                    pid for pid in persisted
+                    if pid.startswith(f"{scoped}-v") or pid.startswith(f"{local}-v")
+                ]
+                if matching:
+                    mapping[local] = sorted(matching)[-1]
     return mapping
 
 

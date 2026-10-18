@@ -184,6 +184,7 @@ def _reset_view_state() -> None:
     st.session_state.selected_edge = None
     st.session_state.polls = 0
     st.session_state.pending_run = None
+    st.session_state.inbox = None
 
 
 def _load_inbox(settings) -> dict:
@@ -318,10 +319,7 @@ def _render_connection_status(settings, *, key_suffix: str = "header") -> None:
     if status.get("state") == "connected":
         tool = status.get("tool") or "approved read"
         query_ids = ", ".join(str(q) for q in status.get("query_ids") or [])
-        meta = (f"Derived from the last successful approved MCP read "
-                f"(`{tool}`" + (f": `{query_ids}`" if query_ids else "") + "). "
-                "It is a point-in-time check, not a live subscription, and it "
-                "is not re-run while an investigation is polling.")
+        meta = (f"")
         if vm.connection_is_stale(status):
             meta += (" The check is older than five minutes — the graph may "
                      "have changed since.")
@@ -693,36 +691,36 @@ def _render_graph_panel(settings, row: dict, view: dict, *,
         str(entry.get("evidence_id"))
         for entry in evidence_entries if entry.get("evidence_id")
     ]
-    focus_label = st.selectbox(
-        "Highlight one evidence record in the graph", evidence_options,
-        key=f"ev-focus-{row.get('alert_id') or 'alert'}",
-        help="Highlights only accounts and transfer legs the selected record "
-             "itself reported — never invented links.",
-    )
+    # focus_label = st.selectbox(
+    #     "Highlight one evidence record in the graph", evidence_options,
+    #     key=f"ev-focus-{row.get('alert_id') or 'alert'}",
+    #     help="Highlights only accounts and transfer legs the selected record "
+    #          "itself reported — never invented links.",
+    # )
     focus_nodes: list[str] = []
     focus_edges: list[list[str]] = []
-    if focus_label != "— none —":
-        entry = next((e for e in evidence_entries
-                      if str(e.get("evidence_id")) == focus_label), None)
-        mapping = vm.evidence_graph_elements(entry)
-        graph_accounts = set(graph["accounts"])
-        graph_edges = {(e.get("src"), e.get("dst")) for e in graph["edges"]}
-        focus_nodes = [n for n in mapping["nodes"] if n in graph_accounts]
-        focus_edges = [list(pair) for pair in mapping["edges"]
-                       if (pair[0], pair[1]) in graph_edges]
-        if focus_nodes or focus_edges:
-            st.caption(
-                f"Highlighting {len(focus_nodes)} account(s) and "
-                f"{len(focus_edges)} recorded leg(s) from `{focus_label}` "
-                "(violet overlay). What is not in the record is not shown."
-            )
-        else:
-            st.caption(
-                f"`{focus_label}` does not map to accounts or legs drawn here "
-                "(it may be policy/metadata evidence, or its entities are "
-                "outside this neighbourhood) — nothing is highlighted rather "
-                "than inventing a relationship."
-            )
+    # if focus_label != "— none —":
+    #     entry = next((e for e in evidence_entries
+    #                   if str(e.get("evidence_id")) == focus_label), None)
+        # mapping = vm.evidence_graph_elements(entry)
+        # graph_accounts = set(graph["accounts"])
+        # graph_edges = {(e.get("src"), e.get("dst")) for e in graph["edges"]}
+        # focus_nodes = [n for n in mapping["nodes"] if n in graph_accounts]
+        # focus_edges = [list(pair) for pair in mapping["edges"]
+        #                if (pair[0], pair[1]) in graph_edges]
+        # if focus_nodes or focus_edges:
+        #     st.caption(
+        #         f"Highlighting {len(focus_nodes)} account(s) and "
+        #         f"{len(focus_edges)} recorded leg(s) from `{focus_label}` "
+        #         "(violet overlay). What is not in the record is not shown."
+        #     )
+        # else:
+        #     st.caption(
+        #         f"`{focus_label}` does not map to accounts or legs drawn here "
+        #         "(it may be policy/metadata evidence, or its entities are "
+        #         "outside this neighbourhood) — nothing is highlighted rather "
+        #         "than inventing a relationship."
+        #     )
 
     col_graph, col_fit = st.columns([5, 1])
     with col_fit:
@@ -858,6 +856,25 @@ def _render_evidence_tab(view: dict, *, partial: bool) -> None:
         return
     if partial:
         st.caption("Live ledger — rows appear as evidence events arrive.")
+    if not partial:
+        # Say WHY a finished run shows "not checked" instead of leaving a
+        # silent wall of statuses: either the report failed (the error is in
+        # Decision & audit) or the verifier produced no claim-level results.
+        report = view.get("report") or {}
+        claims = report.get("claims") or []
+        if rows and not claims:
+            if report.get("error"):
+                st.info(
+                    'Verification statuses show "not checked" because report '
+                    "generation failed for this run — the failure reason is "
+                    "shown under Decision & audit."
+                )
+            else:
+                st.info(
+                    'Verification statuses show "not checked" because this '
+                    "run recorded no claim-level verification assessments — "
+                    "the verifier produced no claims for the generated report."
+                )
     st.caption(
         f"{len(rows)} evidence record(s); multi-query records keep every source "
         "query, never just the first."
@@ -1344,4 +1361,4 @@ def main() -> None:
         st.rerun()
 
 
-main()
+main()
